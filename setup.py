@@ -8,13 +8,13 @@ def read_requirements():
 
 
 setup(
-    name="vm-vpn-connector",
+    name="vm_vpn_connector",
     version="0.0.1",
     packages=find_packages(),
     include_package_data=True,
     install_requires=read_requirements(),
     entry_points="""
         [console_scripts]
-        vm-vpn-connector=vm-vpn-connector.main.cli:cli
+        vm_vpn_connector=vm_vpn_connector.main.cli:cli
     """,
 )
