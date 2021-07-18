@@ -1,16 +1,21 @@
 import os
 import re
-import subprocess
-import sys
-import time
-import unicodedata
-from typing import Generator
 
 import click
 from decouple import config
 
+from ..cli import Context, pass_context
 
-class Context:
+# ------------------------------------------------------------------------------
+#
+#
+#
+# ------------------------------------------------------------------------------
+
+
+class Connector():
+
+    ctx: Context = None
 
     path = config('VPN_PATH', default=None)
     file_pass = f"pass.txt"
@@ -19,14 +24,8 @@ class Context:
     search = None
     location = None
 
-    # --------------------------------------------------------------------------
-    #
-    #
-    #
-    # --------------------------------------------------------------------------
-
-    def __init__(self) -> None:
-        pass
+    def __init__(self, ctx: Context) -> None:
+        self.ctx = ctx
 
     # --------------------------------------------------------------------------
     #
@@ -35,11 +34,11 @@ class Context:
     # --------------------------------------------------------------------------
 
     def connect(self):
-        print("SETUP:")
-        print(f"  - {self.path=}")
-        print(f"  - {self.file_pass=}")
-        print(f"  - {self.size=}")
-        print(f"  - {self.search=}")
+        self.ctx.utils.logging.info("SETUP:")
+        self.ctx.utils.logging.info(f"  - {self.path=}")
+        self.ctx.utils.logging.info(f"  - {self.file_pass=}")
+        self.ctx.utils.logging.info(f"  - {self.size=}")
+        self.ctx.utils.logging.info(f"  - {self.search=}")
 
         if self.path is not None:
             file_path_list = []
@@ -47,7 +46,8 @@ class Context:
 
             if len(file_path_list) > 0:
                 if self.search != None:
-                    file_path_list = [file for file in file_path_list if self.normalize_caseless(self.search) in self.normalize_caseless(file[1])]
+                    file_path_list = [file for file in file_path_list if self.ctx.utils.normalize_caseless(
+                        self.search) in self.ctx.utils.normalize_caseless(file[1])]
 
                 self.print_locations(file_path_list)
 
@@ -61,22 +61,29 @@ class Context:
                             file_pass = None
 
                         print()
-                        print(f"{file=}")
-                        print(f"{file_pass=}")
+                        self.ctx.utils.logging.info(f"{file=}")
+                        self.ctx.utils.logging.info(f"{file_pass=}")
 
                         self.vpn_add(file)
-                        self.vpn(file, file_pass)
+
+                        if file_pass is not None:
+                            self.ctx.utils.run_command_endless(
+                                ['sudo', 'openvpn', '--auth-nocache', '--allow-compression', 'yes', '--data-ciphers', 'AES-256-GCM:AES-128-GCM:AES-256-CBC',
+                                 '--cipher', 'AES-256-GCM', '--config', file, '--auth-user-pass', file_pass])
+                        else:
+                            self.ctx.utils.run_command_endless(['sudo', 'openvpn', '--auth-nocache', '--allow-compression', 'yes',
+                                                               '--data-ciphers', 'AES-256-GCM:AES-128-GCM:AES-256-CBC', '--cipher', 'AES-256-GCM', '--config', file])
                     else:
                         print()
-                        print("choosed file not found")
+                        self.ctx.utils.logging.warning("choosed file not found")
                 except re.error:
-                    print(f"location is not a valid regex:: {self.location}")
+                    self.ctx.utils.logging.exception(f"location is not a valid regex:: {self.location}")
             else:
                 print()
-                print("no vpn files found")
+                self.ctx.utils.logging.warning("no vpn files found")
         else:
             print()
-            print("no path defined 'export VPN_PATH='")
+            self.ctx.utils.logging.warning("no path defined 'export VPN_PATH='")
 
     # --------------------------------------------------------------------------
     #
@@ -89,9 +96,9 @@ class Context:
             file_path_list.sort(key=lambda tup: tup[1])
 
             files_s = [f"{file[1].split('.')[0]}/{(file[1].split('.')[3] if len(file[1].split('.')) > 3 else '')}" for file in file_path_list]
-            files_s = self.group(files_s, self.size)
+            files_s = self.ctx.utils.group(files_s, self.size)
             print()
-            [print(file) for file in files_s]
+            [self.ctx.utils.logging.info(file) for file in files_s]
 
             print()
             self.location = input("location?: ")
@@ -130,38 +137,11 @@ class Context:
                 else:  # not found, we are at the eof
                     fh.write(f"{add_l}\r\n")  # append missing data
 
-    def vpn(self, file, file_pass):
-        x = None
-        is_running = True
-        try:
-            if file_pass is not None:
-                x = subprocess.Popen(['sudo', 'openvpn', '--auth-nocache', '--config', file, '--auth-user-pass', file_pass])
-            else:
-                x = subprocess.Popen(['sudo', 'openvpn', '--auth-nocache', '--config', file, '--auth-user-pass'])
-            while is_running:
-                time.sleep(600)
-        # termination with Ctrl+C
-        except:
-            is_running = False
-            print("process killed!")
-        try:
-            x.terminate()
-        except:
-            pass
-        if x != None:
-            while x.poll() == None:
-                time.sleep(1)
-
     # --------------------------------------------------------------------------
     #
     #
     #
     # --------------------------------------------------------------------------
-
-    def group(self, flat, size): return [flat[i:i+size] for i in range(0, len(flat), size)]
-
-    def normalize_caseless(self, text):
-        return unicodedata.normalize("NFKD", text.casefold())
 
 
 # ------------------------------------------------------------------------------
@@ -175,16 +155,20 @@ class Context:
 @click.option("-s", "--search", help="search to search for openvpn files", type=str, required=False)
 @click.option("-m", "--matrix", help="matrix size to print locations", type=int, required=False)
 @click.option("-l", "--location", help="location to connect to", type=str, required=False)
-@click.pass_context
-def cli(ctx, path, search, matrix, location):
-    """Connect to VPN"""
-    ctx.obj = Context()
+@pass_context
+def cli(ctx: Context, path, search, matrix, location):
+    '''
+        Connect to VPN
+    '''
+    # ctx.utils.logging.info(ctx.verbose)
+
+    ctx.conn = Connector(ctx)
     if path is not None:
-        ctx.obj.path = path
+        ctx.conn.path = path
     if search is not None:
-        ctx.obj.search = search
+        ctx.conn.search = search
     if matrix is not None:
-        ctx.obj.size = matrix
+        ctx.conn.size = matrix
     if location is not None:
-        ctx.obj.location = location
-    ctx.obj.connect()
+        ctx.conn.location = location
+    ctx.conn.connect()

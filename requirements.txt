@@ -1,2 +1,4 @@
 click
+coloredlogs
+verboselogs
 python-decouple

@@ -1,5 +1,7 @@
 from setuptools import find_packages, setup
 
+from vm_vpn_connector.config import PROJECT, VERSION
+
 
 def read_requirements():
     with open("requirements.txt") as req:
@@ -8,13 +10,13 @@ def read_requirements():
 
 
 setup(
-    name="vm_vpn_connector",
-    version="0.0.1",
+    name=f"{PROJECT}",
+    version=VERSION,
     packages=find_packages(),
     include_package_data=True,
     install_requires=read_requirements(),
-    entry_points="""
+    entry_points=f"""
         [console_scripts]
-        vm_vpn_connector=vm_vpn_connector.main.cli:cli
+        {PROJECT}={PROJECT}.cli:cli
     """,
 )
