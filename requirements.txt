@@ -1,4 +1,13 @@
+starlette
 click
 coloredlogs
 verboselogs
+string-color
+progress
+progressbar
+
+maxminddb
+requests
+types-requests
+
 python-decouple
