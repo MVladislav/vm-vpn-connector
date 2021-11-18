@@ -96,7 +96,8 @@ class Utils:
         if not is_init and LOGGING_LEVEL == logging.getLevelName(logging.DEBUG):
             print()
             print('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~')
-            logging.log(logging.DEBUG, f'LOGGING-LEVEL          : {bold(LOGGING_LEVEL)}')
+            logging.log(logging.DEBUG, f'LOGGING-LEVEL          : {bold(ctx.logging_level)}')
+            logging.log(logging.DEBUG, f'LOGGING-VERBOSE        : {bold(ctx.logging_verbose)}')
             logging.log(logging.DEBUG, f'DISABLED SPLIT PROJECT : {bold(self.ctx.disable_split_project)}')
             logging.log(logging.DEBUG, f'DISABLED SPLIT HOST    : {bold(self.ctx.disable_split_host)}')
             logging.log(logging.DEBUG, f'PRINT ONLY MODE        : {bold(self.ctx.print_only_mode)}')
@@ -112,24 +113,41 @@ class Utils:
     # --------------------------------------------------------------------------
 
     def create_folder(self, path: str) -> None:
+        '''
+            create a folder under giving path
+        '''
         Path(path).mkdir(parents=True, exist_ok=True, mode=0o700)
 
     def get_user_path(self) -> str:
+        '''
+            returns path to user home
+        '''
         return str(Path.home())
 
-    def create_service_folder(self, name: str, host: Union[str, None] = None) -> str:
-        path = f'{self.create_service_path(host)}/{name}'
+    def create_service_folder(self, name: Union[str, None] = None, host: Union[str, None] = None, split_host=None, split_project=None) -> str:
+        '''
+            creates a folder with name optional host under base path
+        '''
+        path = self.create_service_path(host=host,
+                                        split_host=split_host, split_project=split_project)
+        path = f'{path}/{name}' if name is not None else path
         self.create_folder(path)
         logging.log(logging.DEBUG, f'new folder created:: {path}')
         return path
 
-    def create_service_path(self, host: Union[str, None] = None):
-        if not self.ctx.disable_split_host and host is not None:
+    def create_service_path(self, host: Union[str, None] = None, split_host=None, split_project=None) -> str:
+        '''
+            creates a path name, will used in call by "create_service_folder"
+        '''
+        split_host = not self.ctx.disable_split_host if split_host is None else split_host
+        split_project = not self.ctx.disable_split_project if split_project is None else split_project
+
+        if split_host and host is not None:
             host = self.slugify(host)
             host = '' if host is None else f'/{host}'
         else:
             host = ''
-        if not self.ctx.disable_split_project:
+        if split_project:
             project = '' if self.ctx.project is None else f'/{self.ctx.project}'
         else:
             project = ''
@@ -149,7 +167,6 @@ class Utils:
         sub_p: Union[Popen[bytes], None] = None
         is_running = True
         try:
-
             index_to_check = 0
             index_to_check = 1 if command_list[index_to_check] == 'sudo' else index_to_check
 
@@ -261,15 +278,16 @@ class Utils:
                     if sub_p.stdout is not None:
                         sub_p_std = sub_p.stdout
                 else:
-                    logging.log(
-                        logging.INFO, 'you run in terminal read mode, some function can maybe not print anything and you will see longer no response, please wait ...')
-                    for stdout_line in sub_p.stdout:
-                        if stdout_line is not None and len(stdout_line) > 0:
-                            if sub_p_std is None:
-                                sub_p_std = stdout_line
-                            else:
-                                sub_p_std += stdout_line
-                            logging.log(logging.INFO, stdout_line.decode().replace('\n', ''))
+                    if sub_p.stdout is not None:
+                        logging.log(
+                            logging.INFO, 'you run in terminal read mode, some function can maybe not print anything and you will see longer no response, please wait ...')
+                        for stdout_line in sub_p.stdout:
+                            if stdout_line is not None and len(stdout_line) > 0:
+                                if sub_p_std is None:
+                                    sub_p_std = stdout_line
+                                else:
+                                    sub_p_std += stdout_line
+                                logging.log(logging.INFO, stdout_line.decode().replace('\n', ''))
             if sub_p.stderr is not None:
                 sub_p_err = sub_p.stderr
         except (SystemExit, KeyboardInterrupt):

@@ -2,12 +2,13 @@ import logging
 import os
 import re
 import sys
+from ipaddress import IPv4Network
 from typing import List, Union
 
-import verboselogs
-
-from ..utils.defaultLogBanner import log_runBanner
 from ..utils.utils import Context, Utils
+
+# import verboselogs
+
 
 # ------------------------------------------------------------------------------
 #
@@ -45,6 +46,17 @@ class ConnectorService():
     file_pass = f"pass.txt"
     file_extension = ".ovpn"
 
+    vpn_conf_add_item: List[str] = [
+        # "dhcp-option DOMAIN 1.1.1.1",
+        # "script-security 2",
+        "block-outside-dns",
+        "up /etc/openvpn/update-resolv-conf",
+        "up-restart",
+        "down /etc/openvpn/update-resolv-conf",
+        "down-pre",
+        # "dhcp-option DOMAIN-ROUTE .",
+    ]
+
     # --------------------------------------------------------------------------
     #
     #
@@ -67,7 +79,9 @@ class ConnectorService():
     # --------------------------------------------------------------------------
 
     def connect(self, path: Union[str, None] = None, search: Union[str, None] = None,
-                matrix: int = 10, location: Union[str, None] = None) -> None:
+                matrix: int = 10, location: Union[str, None] = None,
+                network: Union[str, None] = None, gateway: Union[str, None] = None,
+                metric: int = 50, script_security: int = 0) -> None:
         try:
             logging.log(logging.DEBUG, "SETUP:")
             logging.log(logging.DEBUG, f"  - {path=}")
@@ -75,8 +89,23 @@ class ConnectorService():
             logging.log(logging.DEBUG, f"  - {self.file_extension=}")
             logging.log(logging.DEBUG, f"  - {matrix=}")
             logging.log(logging.DEBUG, f"  - {search=}")
+            logging.log(logging.DEBUG, f"  - {network=}")
+            logging.log(logging.DEBUG, f"  - {gateway=}")
+            logging.log(logging.DEBUG, f"  - {metric=}")
+            logging.log(logging.DEBUG, f"  - {script_security=}")
 
             self.location = location
+
+            option_route = []
+            if network is not None:
+                ip = IPv4Network(network)
+                option_route = ['--route', str(ip.network_address)]
+                if gateway is not None:
+                    option_route.append(str(ip.netmask))
+                    option_route.append(gateway)
+                    option_route.append(str(metric))
+            options = ['--auth-nocache', '--data-ciphers', 'AES-256-GCM:AES-128-GCM:AES-256-CBC:AES-128-CBC',
+                       '--allow-compression', 'yes', '--script-security', str(script_security), '--cipher', 'AES-256-GCM']+option_route
 
             if path is not None:
                 file_path_list = []
@@ -109,11 +138,12 @@ class ConnectorService():
 
                             command: List[str] = []
                             if file_pass is not None:
-                                command = ['sudo', 'openvpn', '--auth-nocache', '--data-ciphers', 'AES-256-GCM:AES-128-GCM:AES-256-CBC:AES-128-CBC',
-                                           '--cipher', 'AES-256-GCM', '--script-security', '0', '--config', file, '--auth-user-pass', file_pass]
+                                command = ['sudo', 'openvpn',
+                                           '--config', file,
+                                           '--auth-user-pass', file_pass]+options
                             else:
-                                command = ['sudo', 'openvpn', '--auth-nocache', '--allow-compression', 'yes',
-                                           '--data-ciphers', 'AES-256-GCM:AES-128-GCM:AES-256-CBC', '--cipher', 'AES-256-GCM', '--config', file]
+                                command = ['sudo', 'openvpn',
+                                           '--config', file]+options
                             self.utils.run_command_endless(command)
                             # self.utils.run_command(command_list=command)
                         else:
@@ -154,27 +184,18 @@ class ConnectorService():
     # --------------------------------------------------------------------------
 
     def vpn_add(self, file: str):
-        add_list = [
-            "dhcp-option DOMAIN 1.1.1.1",
-            "script-security 2",
-            "up /etc/openvpn/update-resolv-conf",
-            "up-restart",
-            "down /etc/openvpn/update-resolv-conf",
-            "down-pre",
-            "dhcp-option DOMAIN-ROUTE .",
-        ]
 
         with open(file, 'r+') as fh:
             # text = fh.read()
 
-            # for add_l in add_list:
+            # for add_l in vpn_conf_add_item:
             #     add_l_r = re.escape(add_l)
             #     print(rf"^{add_l_r}")
 
             #     # fh.seek(0)
             #     fh.write(re.sub(rf'^{add_l_r}', rf'{add_l_r}\n', text))
 
-            for add_l in add_list:
+            for add_l in self.vpn_conf_add_item:
                 for line in fh:
                     if add_l in line:
                         break
