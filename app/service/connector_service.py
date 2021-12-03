@@ -81,7 +81,7 @@ class ConnectorService():
     def connect(self, path: Union[str, None] = None, search: Union[str, None] = None,
                 matrix: int = 10, location: Union[str, None] = None,
                 network: Union[str, None] = None, gateway: Union[str, None] = None,
-                metric: int = 50, script_security: int = 0) -> None:
+                metric: int = 50, script_security: int = 0, append_options_to_file: bool = True) -> None:
         try:
             logging.log(logging.DEBUG, "SETUP:")
             logging.log(logging.DEBUG, f"  - {path=}")
@@ -134,7 +134,8 @@ class ConnectorService():
                             logging.log(logging.INFO, f"{file=}")
                             logging.log(logging.INFO, f"{file_pass=}")
 
-                            self.vpn_add(file=file)
+                            if append_options_to_file:
+                                self.vpn_add(file=file)
 
                             command: List[str] = []
                             if file_pass is not None:
