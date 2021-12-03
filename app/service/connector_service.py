@@ -200,8 +200,8 @@ class ConnectorService():
                 for line in fh:
                     if add_l in line:
                         break
-                else:  # not found, we are at the eof
-                    fh.write(f"{add_l}\r\n")  # append missing data
+                    else:  # not found, we are at the eof
+                        fh.write(f"{add_l}\r\n")  # append missing data
 
     # --------------------------------------------------------------------------
     #
