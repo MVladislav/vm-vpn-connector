@@ -49,7 +49,7 @@ class ConnectorService():
     vpn_conf_add_item: List[str] = [
         # "dhcp-option DOMAIN 1.1.1.1",
         # "script-security 2",
-        "block-outside-dns",
+        # "block-outside-dns",
         "up /etc/openvpn/update-resolv-conf",
         "up-restart",
         "down /etc/openvpn/update-resolv-conf",
@@ -197,11 +197,13 @@ class ConnectorService():
             #     fh.write(re.sub(rf'^{add_l_r}', rf'{add_l_r}\n', text))
 
             for add_l in self.vpn_conf_add_item:
+                is_in: bool = False
                 for line in fh:
                     if add_l in line:
+                        is_in = True
                         break
-                    else:  # not found, we are at the eof
-                        fh.write(f"{add_l}\r\n")  # append missing data
+                if not is_in:  # not found, we are at the eof
+                    fh.write(f"{add_l}\r\n")  # append missing data
 
     # --------------------------------------------------------------------------
     #
